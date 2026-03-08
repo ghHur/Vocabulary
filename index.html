@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a1714">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vocabulary">
+<title>Vocabulary — 나만의 영어 단어장</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #1a1714;
+  --surface: #242018;
+  --card: #2d2720;
+  --card-hover: #362f28;
+  --accent: #e8a44a;
+  --accent-dim: #c4863a;
+  --text: #e8e0d4;
+  --text-dim: #a09888;
+  --text-muted: #706858;
+  --border: #3a3328;
+  --danger: #d45454;
+  --success: #5aab6a;
+  --tag-bg: #3a3020;
+  --tag-text: #d4b878;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Header */
+.header {
+  padding: 24px 20px 18px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+  position: sticky; top: 0; z-index: 100;
+}
+.header-inner { max-width: 720px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-family: 'Playfair Display', Georgia, serif; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.logo span { color: var(--accent); }
+.word-count { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+.header-actions { display: flex; gap: 8px; }
+
+/* Buttons */
+.btn {
+  border: none; border-radius: 8px; font-family: inherit; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: all 0.15s; padding: 8px 16px;
+}
+.btn-primary { background: var(--accent); color: var(--bg); font-weight: 700; }
+.btn-primary:hover { transform: translateY(-1px); filter: brightness(1.1); }
+.btn-primary:disabled { opacity: 0.4; transform: none; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger:hover { border-color: var(--danger) !important; color: var(--danger) !important; }
+.btn-ghost { background: transparent; border: none; color: var(--text-muted); padding: 8px; }
+.btn-ghost:hover { color: var(--text); }
+
+/* Content */
+.content { max-width: 720px; margin: 0 auto; padding: 20px 20px 80px; }
+
+/* Search */
+.search-wrap { position: relative; margin-bottom: 12px; }
+.search-icon {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  opacity: 0.3; pointer-events: none;
+}
+.search-input {
+  width: 100%; padding: 10px 14px 10px 40px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); font-size: 14px; font-family: inherit; outline: none;
+  transition: border-color 0.2s;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--text-muted); }
+
+/* Filters */
+.filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+.filter-select {
+  background: var(--card); border: 1px solid var(--border); color: var(--text-dim);
+  padding: 6px 12px; border-radius: 8px; font-size: 12px; font-family: inherit;
+  cursor: pointer; outline: none;
+}
+.filter-select.active { border-color: var(--accent); color: var(--accent); }
+.filter-count { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+.filter-reset { background: none; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; text-decoration: underline; font-family: inherit; }
+.diff-btn {
+  background: transparent; border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 8px; cursor: pointer; display: flex; align-items: center; gap: 3px;
+  font-size: 11px; color: var(--text-muted); font-family: inherit; transition: all 0.15s;
+}
+.diff-btn.active { background: rgba(232,164,74,0.12); border-color: var(--accent); color: var(--accent); }
+
+/* Word Card */
+.word-card {
+  background: var(--card); border-radius: 12px; border: 1px solid var(--border);
+  margin-bottom: 8px; transition: background 0.15s; cursor: pointer; overflow: hidden;
+}
+.word-card:hover { background: var(--card-hover); }
+.card-main { padding: 14px 18px; }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.card-left { flex: 1; min-width: 0; }
+.term-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+.term {
+  font-family: 'Playfair Display', Georgia, serif; font-size: 19px; font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.meaning { font-size: 14px; color: var(--text-dim); line-height: 1.5; }
+.card-right { display: flex; align-items: center; gap: 8px; margin-left: 12px; flex-shrink: 0; }
+.tag {
+  background: var(--tag-bg); color: var(--tag-text); padding: 3px 10px;
+  border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.date { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+/* Expanded */
+.card-detail {
+  padding: 0 18px 14px; border-top: 1px solid var(--border); margin-top: 10px; padding-top: 14px;
+}
+.detail-label {
+  font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.detail-example {
+  font-size: 14px; color: var(--text-dim); font-style: italic; line-height: 1.6;
+  padding: 8px 14px; background: var(--surface); border-radius: 8px;
+  border-left: 3px solid var(--accent); margin-bottom: 12px;
+}
+.detail-notes { font-size: 14px; color: var(--text-dim); line-height: 1.6; margin-bottom: 12px; }
+.card-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Star Rating */
+.stars { display: flex; gap: 2px; }
+.star { cursor: pointer; transition: transform 0.15s; }
+.star:hover { transform: scale(1.2); }
+.star.readonly { cursor: default; }
+.star.readonly:hover { transform: none; }
+
+/* Form */
+.form-panel { background: var(--card); border-radius: 14px; padding: 22px; border: 1px solid var(--border); }
+.form-title { font-size: 18px; font-weight: 700; font-family: 'Playfair Display', Georgia, serif; margin-bottom: 18px; }
+.form-grid { display: grid; gap: 14px; }
+.form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.06em; }
+.form-input, .form-textarea {
+  width: 100%; padding: 10px 14px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+  font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.2s;
+}
+.form-input:focus, .form-textarea:focus { border-color: var(--accent); }
+.form-input::placeholder, .form-textarea::placeholder { color: var(--text-muted); }
+.form-textarea { min-height: 60px; resize: vertical; }
+.tag-input-row { display: flex; gap: 8px; }
+.tag-input-row .form-input { flex: 1; }
+.btn-tag { background: var(--tag-bg); color: var(--tag-text); border: none; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit; }
+.tag-list { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.tag-removable { cursor: pointer; }
+.tag-removable:hover { opacity: 0.7; }
+.form-bottom-row { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: end; }
+.form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+/* Empty */
+.empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.empty-icon { font-size: 48px; margin-bottom: 14px; opacity: 0.4; }
+.empty-title { font-size: 16px; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; }
+.empty-sub { font-size: 14px; line-height: 1.6; }
+
+/* Quiz */
+.quiz-center { text-align: center; padding: 30px 0; }
+.quiz-title { font-size: 24px; font-weight: 700; font-family: 'Playfair Display', Georgia, serif; margin-bottom: 8px; }
+.quiz-sub { color: var(--text-dim); font-size: 14px; margin-bottom: 28px; }
+.quiz-modes { display: flex; gap: 16px; justify-content: center; }
+.quiz-mode-btn {
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  padding: 20px 32px; border-radius: 12px; font-size: 15px; cursor: pointer;
+  font-family: inherit; transition: all 0.2s;
+}
+.quiz-mode-btn:hover { border-color: var(--accent); }
+.quiz-mode-btn .emoji { font-size: 28px; margin-bottom: 8px; }
+.quiz-mode-btn .label { font-weight: 600; }
+.quiz-progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 28px; }
+.quiz-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+.quiz-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 13px; color: var(--text-muted); }
+.quiz-score-ok { color: var(--success); }
+.quiz-score-fail { color: var(--danger); }
+.quiz-question-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+.quiz-question-word { font-size: 30px; font-weight: 700; font-family: 'Playfair Display', Georgia, serif; margin-bottom: 14px; }
+.quiz-hint { font-size: 13px; color: var(--text-muted); font-style: italic; margin-bottom: 20px; }
+.quiz-reveal-btn {
+  width: 100%; padding: 14px; background: var(--card); border: 1px solid var(--border);
+  color: var(--text); border-radius: 10px; font-size: 15px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.quiz-reveal-btn:hover { border-color: var(--accent); }
+.quiz-answer-box {
+  padding: 20px; background: var(--card); border-radius: 10px; margin-bottom: 18px;
+  border: 1px solid rgba(232,164,74,0.25);
+}
+.quiz-answer-text { font-size: 24px; font-weight: 700; color: var(--accent); }
+.quiz-answer-example { font-size: 13px; color: var(--text-dim); margin-top: 8px; font-style: italic; }
+.quiz-judge { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.quiz-wrong {
+  padding: 12px; background: rgba(212,84,84,0.09); border: 1px solid rgba(212,84,84,0.25);
+  color: var(--danger); border-radius: 10px; font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.quiz-right {
+  padding: 12px; background: rgba(90,171,106,0.09); border: 1px solid rgba(90,171,106,0.25);
+  color: var(--success); border-radius: 10px; font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.quiz-result-icon { font-size: 48px; margin-bottom: 14px; }
+.quiz-result-pct { font-size: 36px; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+.quiz-result-detail { color: var(--text-dim); margin-bottom: 28px; }
+.quiz-result-actions { display: flex; gap: 12px; justify-content: center; }
+
+/* Export/Import */
+.data-bar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+
+/* Responsive */
+@media (max-width: 520px) {
+  .header { padding: 18px 16px 14px; }
+  .content { padding: 16px 16px 80px; }
+  .form-row2 { grid-template-columns: 1fr; }
+  .form-bottom-row { grid-template-columns: 1fr; }
+  .quiz-modes { flex-direction: column; align-items: center; }
+  .card-right { flex-wrap: wrap; justify-content: flex-end; }
+  .term { font-size: 17px; }
+  .logo { font-size: 22px; }
+}
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn 0.25s ease; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Storage ───
+const STORAGE_KEY = 'vocab-notebook-words';
+
+function loadWords() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveWords(words) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+}
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ─── State ───
+let state = {
+  words: loadWords(),
+  view: 'list', // list, add, edit, quiz
+  editWord: null,
+  search: '',
+  filterTag: '',
+  filterDifficulty: 0,
+  sortBy: 'newest',
+  // quiz
+  quizMode: null,
+  quizPool: [],
+  quizCurrent: 0,
+  quizShowAnswer: false,
+  quizScore: { correct: 0, wrong: 0 },
+  quizFinished: false,
+  // expanded cards
+  expandedId: null,
+};
+
+function setState(updates) {
+  Object.assign(state, updates);
+  render();
+}
+
+// ─── Star SVG ───
+function starSvg(filled, size = 14) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24">
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+      fill="${filled ? 'var(--accent)' : 'transparent'}" stroke="${filled ? 'var(--accent)' : 'var(--text-muted)'}" stroke-width="1.5"/>
+  </svg>`;
+}
+
+function starsHtml(rating, interactive = false, wordId = null, size = 14) {
+  let html = `<div class="stars">`;
+  for (let i = 1; i <= 3; i++) {
+    const cls = interactive ? 'star' : 'star readonly';
+    const click = interactive ? `onclick="handleRate('${wordId}', ${i === rating ? 0 : i})"` : '';
+    html += `<span class="${cls}" ${click}>${starSvg(i <= rating, size)}</span>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+// ─── Export / Import ───
+function exportWords() {
+  const data = JSON.stringify(state.words, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `vocabulary-${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('단어장 내보내기 완료!');
+}
+
+function importWords() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (!Array.isArray(imported)) throw new Error();
+        const existing = new Set(state.words.map(w => w.term.toLowerCase()));
+        let added = 0;
+        imported.forEach(w => {
+          if (w.term && w.meaning && !existing.has(w.term.toLowerCase())) {
+            w.id = w.id || generateId();
+            w.createdAt = w.createdAt || Date.now();
+            state.words.unshift(w);
+            existing.add(w.term.toLowerCase());
+            added++;
+          }
+        });
+        saveWords(state.words);
+        showToast(`${added}개 단어 가져오기 완료!`);
+        render();
+      } catch {
+        showToast('파일 형식이 올바르지 않습니다');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function exportCSV() {
+  let csv = 'term,meaning,example,notes,tags,difficulty,date\n';
+  state.words.forEach(w => {
+    csv += `"${(w.term||'').replace(/"/g,'""')}","${(w.meaning||'').replace(/"/g,'""')}","${(w.example||'').replace(/"/g,'""')}","${(w.notes||'').replace(/"/g,'""')}","${(w.tags||[]).join(';')}",${w.difficulty||0},"${formatDate(w.createdAt)}"\n`;
+  });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = `vocabulary-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('CSV 내보내기 완료!');
+}
+
+// ─── Handlers ───
+function handleAdd() {
+  const term = document.getElementById('f-term').value.trim();
+  const meaning = document.getElementById('f-meaning').value.trim();
+  if (!term || !meaning) return showToast('단어와 뜻은 필수입니다');
+  const word = {
+    id: generateId(), term, meaning,
+    example: document.getElementById('f-example').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
+    tags: state._formTags || [],
+    difficulty: state._formDifficulty || 0,
+    createdAt: Date.now(),
+  };
+  state.words.unshift(word);
+  saveWords(state.words);
+  state._formTags = []; state._formDifficulty = 0;
+  showToast('단어가 추가되었습니다');
+  setState({ view: 'list' });
+}
+
+function handleEdit() {
+  const term = document.getElementById('f-term').value.trim();
+  const meaning = document.getElementById('f-meaning').value.trim();
+  if (!term || !meaning) return showToast('단어와 뜻은 필수입니다');
+  const idx = state.words.findIndex(w => w.id === state.editWord.id);
+  if (idx >= 0) {
+    state.words[idx] = {
+      ...state.words[idx], term, meaning,
+      example: document.getElementById('f-example').value.trim(),
+      notes: document.getElementById('f-notes').value.trim(),
+      tags: state._formTags || [],
+      difficulty: state._formDifficulty || 0,
+    };
+    saveWords(state.words);
+    showToast('수정 완료');
+  }
+  state._formTags = []; state._formDifficulty = 0;
+  setState({ view: 'list', editWord: null });
+}
+
+function handleDelete(id) {
+  state.words = state.words.filter(w => w.id !== id);
+  saveWords(state.words);
+  showToast('삭제되었습니다');
+  render();
+}
+
+function handleRate(id, r) {
+  const w = state.words.find(w => w.id === id);
+  if (w) { w.difficulty = r; saveWords(state.words); render(); }
+}
+
+function addFormTag() {
+  const input = document.getElementById('f-tag-input');
+  const t = input.value.trim();
+  if (!t) return;
+  state._formTags = state._formTags || [];
+  if (!state._formTags.includes(t)) { state._formTags.push(t); }
+  input.value = '';
+  renderFormTags();
+}
+
+function removeFormTag(tag) {
+  state._formTags = (state._formTags || []).filter(t => t !== tag);
+  renderFormTags();
+}
+
+function renderFormTags() {
+  const el = document.getElementById('f-tags-list');
+  if (!el) return;
+  el.innerHTML = (state._formTags || []).map(t =>
+    `<span class="tag tag-removable" onclick="removeFormTag('${escapeHtml(t)}')">${escapeHtml(t)} <span style="opacity:0.5">×</span></span>`
+  ).join('');
+}
+
+function setFormDifficulty(d) {
+  state._formDifficulty = (state._formDifficulty === d) ? 0 : d;
+  const el = document.getElementById('f-difficulty');
+  if (el) el.innerHTML = starsHtml(state._formDifficulty, false, null, 20).replace(/readonly/g, '');
+}
+
+// ─── Quiz Handlers ───
+function startQuiz(mode) {
+  const shuffled = [...state.words].sort(() => Math.random() - 0.5).slice(0, Math.min(20, state.words.length));
+  setState({
+    quizMode: mode, quizPool: shuffled, quizCurrent: 0,
+    quizShowAnswer: false, quizScore: { correct: 0, wrong: 0 }, quizFinished: false,
+  });
+}
+
+function quizReveal() { setState({ quizShowAnswer: true }); }
+
+function quizJudge(correct) {
+  const s = { ...state.quizScore };
+  s[correct ? 'correct' : 'wrong']++;
+  const next = state.quizCurrent + 1;
+  setState({
+    quizScore: s, quizShowAnswer: false,
+    quizCurrent: next, quizFinished: next >= state.quizPool.length,
+  });
+}
+
+// ─── Filtering ───
+function getFiltered() {
+  let words = [...state.words];
+  if (state.search) {
+    const s = state.search.toLowerCase();
+    words = words.filter(w =>
+      w.term.toLowerCase().includes(s) || w.meaning.toLowerCase().includes(s) || (w.notes||'').toLowerCase().includes(s)
+    );
+  }
+  if (state.filterTag) words = words.filter(w => (w.tags||[]).includes(state.filterTag));
+  if (state.filterDifficulty > 0) words = words.filter(w => (w.difficulty||0) === state.filterDifficulty);
+
+  words.sort((a, b) => {
+    if (state.sortBy === 'newest') return b.createdAt - a.createdAt;
+    if (state.sortBy === 'oldest') return a.createdAt - b.createdAt;
+    if (state.sortBy === 'alpha') return a.term.localeCompare(b.term);
+    if (state.sortBy === 'difficulty') return (b.difficulty||0) - (a.difficulty||0);
+    return 0;
+  });
+  return words;
+}
+
+function getAllTags() {
+  const set = new Set();
+  state.words.forEach(w => (w.tags||[]).forEach(t => set.add(t)));
+  return [...set].sort();
+}
+
+// ─── Render ───
+function render() {
+  const app = document.getElementById('app');
+  const isQuiz = state.view === 'quiz';
+
+  // Header
+  let html = `
+  <div class="header">
+    <div class="header-inner">
+      <div>
+        <div class="logo">Vocabulary<span>.</span></div>
+        <div class="word-count">${state.words.length}개 단어 수집됨</div>
+      </div>
+      <div class="header-actions">
+        ${state.words.length >= 3 && !isQuiz ? `<button class="btn btn-outline" onclick="setState({view:'quiz',quizMode:null,quizFinished:false})">복습 퀴즈</button>` : ''}
+        ${state.view !== 'add' && !isQuiz ? `<button class="btn btn-primary" onclick="state._formTags=[];state._formDifficulty=0;setState({view:'add'})">+ 단어 추가</button>` : ''}
+        ${isQuiz ? `<button class="btn btn-outline" onclick="setState({view:'list'})">돌아가기</button>` : ''}
+      </div>
+    </div>
+  </div>
+  <div class="content">`;
+
+  if (state.view === 'quiz') {
+    html += renderQuiz();
+  } else if (state.view === 'add') {
+    html += renderForm(null);
+  } else if (state.view === 'edit' && state.editWord) {
+    html += renderForm(state.editWord);
+  } else {
+    html += renderList();
+  }
+
+  html += `</div>`;
+  app.innerHTML = html;
+
+  // Focus term input
+  if (state.view === 'add' || state.view === 'edit') {
+    const ti = document.getElementById('f-term');
+    if (ti) ti.focus();
+  }
+}
+
+function renderList() {
+  const filtered = getFiltered();
+  const allTags = getAllTags();
+  const hasFilters = state.search || state.filterTag || state.filterDifficulty > 0;
+
+  let html = '';
+
+  // Data bar
+  if (state.words.length > 0) {
+    html += `<div class="data-bar">
+      <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="exportWords()">JSON 내보내기</button>
+      <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="exportCSV()">CSV 내보내기</button>
+      <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="importWords()">가져오기</button>
+    </div>`;
+  }
+
+  // Search
+  html += `<div class="search-wrap">
+    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    <input class="search-input" placeholder="단어, 뜻, 메모로 검색..." value="${escapeHtml(state.search)}"
+      oninput="state.search=this.value;render()">
+  </div>`;
+
+  // Filters
+  html += `<div class="filters">
+    <select class="filter-select" onchange="state.sortBy=this.value;render()">
+      <option value="newest" ${state.sortBy==='newest'?'selected':''}>최신순</option>
+      <option value="oldest" ${state.sortBy==='oldest'?'selected':''}>오래된순</option>
+      <option value="alpha" ${state.sortBy==='alpha'?'selected':''}>알파벳순</option>
+      <option value="difficulty" ${state.sortBy==='difficulty'?'selected':''}>난이도순</option>
+    </select>`;
+
+  if (allTags.length > 0) {
+    html += `<select class="filter-select ${state.filterTag ? 'active' : ''}" onchange="state.filterTag=this.value;render()">
+      <option value="">모든 태그</option>
+      ${allTags.map(t => `<option value="${escapeHtml(t)}" ${state.filterTag===t?'selected':''}>${escapeHtml(t)}</option>`).join('')}
+    </select>`;
+  }
+
+  for (let d = 1; d <= 3; d++) {
+    html += `<button class="diff-btn ${state.filterDifficulty===d?'active':''}"
+      onclick="state.filterDifficulty=${state.filterDifficulty===d?0:d};render()">
+      ${starSvg(state.filterDifficulty===d, 12)}<span>${d}</span>
+    </button>`;
+  }
+
+  if (hasFilters) html += `<button class="filter-reset" onclick="state.search='';state.filterTag='';state.filterDifficulty=0;render()">필터 초기화</button>`;
+  html += `<span class="filter-count">${filtered.length}개 표시</span></div>`;
+
+  // Cards
+  if (filtered.length === 0) {
+    if (state.words.length === 0) {
+      html += `<div class="empty"><div class="empty-icon">📚</div><div class="empty-title">단어장이 비어 있어요</div><div class="empty-sub">'+ 단어 추가' 버튼으로 첫 단어를 등록해 보세요</div></div>`;
+    } else {
+      html += `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">검색 결과가 없습니다</div><div class="empty-sub">다른 키워드로 검색하거나 필터를 조정해 보세요</div></div>`;
+    }
+  } else {
+    filtered.forEach(w => {
+      const isExpanded = state.expandedId === w.id;
+      html += `<div class="word-card fade-in" onclick="state.expandedId=state.expandedId==='${w.id}'?null:'${w.id}';render()">
+        <div class="card-main">
+          <div class="card-top">
+            <div class="card-left">
+              <div class="term-row">
+                <span class="term">${escapeHtml(w.term)}</span>
+                ${starsHtml(w.difficulty||0, true, w.id)}
+              </div>
+              <div class="meaning">${escapeHtml(w.meaning)}</div>
+            </div>
+            <div class="card-right">
+              ${(w.tags||[]).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}
+              <span class="date">${formatDate(w.createdAt)}</span>
+            </div>
+          </div>`;
+
+      if (isExpanded) {
+        html += `<div class="card-detail">`;
+        if (w.example) html += `<div class="detail-label">예문</div><div class="detail-example">${escapeHtml(w.example)}</div>`;
+        if (w.notes) html += `<div class="detail-label">메모</div><div class="detail-notes">${escapeHtml(w.notes)}</div>`;
+        html += `<div class="card-actions">
+          <button class="btn btn-outline" onclick="event.stopPropagation();state._formTags=[...(state.words.find(w=>w.id==='${w.id}').tags||[])];state._formDifficulty=state.words.find(w=>w.id==='${w.id}').difficulty||0;setState({view:'edit',editWord:state.words.find(w=>w.id==='${w.id}')})">수정</button>
+          <button class="btn btn-outline btn-danger" onclick="event.stopPropagation();if(confirm('정말 삭제할까요?'))handleDelete('${w.id}')">삭제</button>
+        </div></div>`;
+      }
+      html += `</div></div>`;
+    });
+  }
+
+  return html;
+}
+
+function renderForm(initial) {
+  const isEdit = !!initial;
+  state._formTags = state._formTags || (initial ? [...(initial.tags||[])] : []);
+  state._formDifficulty = state._formDifficulty ?? (initial ? initial.difficulty||0 : 0);
+
+  return `<div class="form-panel fade-in">
+    <div class="form-title">${isEdit ? '단어 수정' : '새 단어 추가'}</div>
+    <div class="form-grid">
+      <div class="form-row2">
+        <div>
+          <label class="form-label">단어 *</label>
+          <input class="form-input" id="f-term" placeholder="English word" value="${escapeHtml(initial?.term||'')}"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();${isEdit?'handleEdit()':'handleAdd()'}}">
+        </div>
+        <div>
+          <label class="form-label">뜻 *</label>
+          <input class="form-input" id="f-meaning" placeholder="한국어 뜻" value="${escapeHtml(initial?.meaning||'')}"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();${isEdit?'handleEdit()':'handleAdd()'}}">
+        </div>
+      </div>
+      <div>
+        <label class="form-label">예문</label>
+        <input class="form-input" id="f-example" placeholder="The word in context..." value="${escapeHtml(initial?.example||'')}">
+      </div>
+      <div>
+        <label class="form-label">메모</label>
+        <textarea class="form-textarea" id="f-notes" placeholder="어원, 유의어, 참고 사항 등">${escapeHtml(initial?.notes||'')}</textarea>
+      </div>
+      <div class="form-bottom-row">
+        <div>
+          <label class="form-label">태그</label>
+          <div class="tag-input-row">
+            <input class="form-input" id="f-tag-input" placeholder="예: COMP1010, 게임용어"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();addFormTag()}">
+            <button class="btn-tag" onclick="addFormTag()">+ 태그</button>
+          </div>
+          <div class="tag-list" id="f-tags-list">
+            ${(state._formTags||[]).map(t => `<span class="tag tag-removable" onclick="removeFormTag('${escapeHtml(t)}')">${escapeHtml(t)} <span style="opacity:0.5">×</span></span>`).join('')}
+          </div>
+        </div>
+        <div>
+          <label class="form-label">난이도</label>
+          <div id="f-difficulty" class="stars" style="cursor:pointer">
+            ${[1,2,3].map(i => `<span class="star" onclick="setFormDifficulty(${i})">${starSvg(i <= (state._formDifficulty||0), 20)}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="state._formTags=[];state._formDifficulty=0;setState({view:'list',editWord:null})">취소</button>
+      <button class="btn btn-primary" onclick="${isEdit ? 'handleEdit()' : 'handleAdd()'}">${isEdit ? '수정 완료' : '추가'}</button>
+    </div>
+  </div>`;
+}
+
+function renderQuiz() {
+  // Mode selection
+  if (!state.quizMode) {
+    return `<div class="quiz-center fade-in">
+      <div class="quiz-title">복습 퀴즈</div>
+      <div class="quiz-sub">${Math.min(20, state.words.length)}개 단어로 퀴즈를 시작합니다</div>
+      <div class="quiz-modes">
+        <button class="quiz-mode-btn" onclick="startQuiz('en-ko')">
+          <div class="emoji">🇺🇸 → 🇰🇷</div><div class="label">영어 → 한국어</div>
+        </button>
+        <button class="quiz-mode-btn" onclick="startQuiz('ko-en')">
+          <div class="emoji">🇰🇷 → 🇺🇸</div><div class="label">한국어 → 영어</div>
+        </button>
+      </div>
+    </div>`;
+  }
+
+  // Result
+  if (state.quizFinished || state.quizPool.length === 0) {
+    const total = state.quizScore.correct + state.quizScore.wrong;
+    const pct = total > 0 ? Math.round((state.quizScore.correct / total) * 100) : 0;
+    const emoji = pct >= 80 ? '🎉' : pct >= 50 ? '💪' : '📖';
+    return `<div class="quiz-center fade-in">
+      <div class="quiz-result-icon">${emoji}</div>
+      <div class="quiz-title">퀴즈 완료!</div>
+      <div class="quiz-result-pct">${pct}%</div>
+      <div class="quiz-result-detail">${total}개 중 ${state.quizScore.correct}개 정답</div>
+      <div class="quiz-result-actions">
+        <button class="btn btn-primary" onclick="setState({quizMode:null,quizFinished:false})">다시 하기</button>
+        <button class="btn btn-outline" onclick="setState({view:'list'})">돌아가기</button>
+      </div>
+    </div>`;
+  }
+
+  // Question
+  const w = state.quizPool[state.quizCurrent];
+  const question = state.quizMode === 'en-ko' ? w.term : w.meaning;
+  const answer = state.quizMode === 'en-ko' ? w.meaning : w.term;
+  const qLabel = state.quizMode === 'en-ko' ? '이 단어의 뜻은?' : '이 뜻의 영어 단어는?';
+
+  let html = `<div style="max-width:500px;margin:0 auto" class="fade-in">
+    <div class="quiz-header">
+      <span>${state.quizCurrent + 1} / ${state.quizPool.length}</span>
+      <div><span class="quiz-score-ok">✓ ${state.quizScore.correct}</span>&nbsp;&nbsp;<span class="quiz-score-fail">✗ ${state.quizScore.wrong}</span></div>
+    </div>
+    <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${(state.quizCurrent/state.quizPool.length)*100}%"></div></div>
+    <div class="quiz-center">
+      <div class="quiz-question-label">${qLabel}</div>
+      <div class="quiz-question-word">${escapeHtml(question)}</div>`;
+
+  if (w.example && !state.quizShowAnswer) {
+    const hint = w.example.replace(new RegExp(w.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '____');
+    html += `<div class="quiz-hint">힌트: ${escapeHtml(hint)}</div>`;
+  }
+
+  if (!state.quizShowAnswer) {
+    html += `<button class="quiz-reveal-btn" onclick="quizReveal()">정답 보기</button>`;
+  } else {
+    html += `<div class="quiz-answer-box">
+      <div class="quiz-answer-text">${escapeHtml(answer)}</div>
+      ${w.example ? `<div class="quiz-answer-example">${escapeHtml(w.example)}</div>` : ''}
+    </div>
+    <div class="quiz-judge">
+      <button class="quiz-wrong" onclick="quizJudge(false)">몰랐어요 ✗</button>
+      <button class="quiz-right" onclick="quizJudge(true)">알았어요 ✓</button>
+    </div>`;
+  }
+
+  html += `</div>
+    <button class="btn-ghost" style="width:100%;margin-top:20px;text-align:center" onclick="setState({view:'list'})">퀴즈 종료</button>
+  </div>`;
+  return html;
+}
+
+// ─── Service Worker ───
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+// ─── Init ───
+render();
+</script>
+</body>
+</html>
