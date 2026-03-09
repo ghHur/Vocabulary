@@ -1,12 +1,10 @@
-const CACHE_NAME = 'vocab-v1';
+const CACHE_NAME = 'vocab-v2';
 const ASSETS = [
   './',
   './index.html',
-  './manifest.json',
-  'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap'
+  './manifest.json'
 ];
 
-// Install
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
@@ -14,7 +12,6 @@ self.addEventListener('install', event => {
   self.skipWaiting();
 });
 
-// Activate - clean old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -24,22 +21,25 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch - cache first, network fallback
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+
+  // API 요청과 외부 요청은 캐싱하지 않고 네트워크로 직접 전달
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
+      const fetchPromise = fetch(event.request).then(response => {
         if (response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => {
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
+      }).catch(() => cached);
+
+      return cached || fetchPromise;
     })
   );
 });
