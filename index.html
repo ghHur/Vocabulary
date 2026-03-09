@@ -31,6 +31,23 @@
   --tag-text: #d4b878;
 }
 
+[data-theme="light"] {
+  --bg: #f5f0eb;
+  --surface: #ebe5dd;
+  --card: #ffffff;
+  --card-hover: #f8f4ef;
+  --accent: #c4863a;
+  --accent-dim: #a06a28;
+  --text: #2c2416;
+  --text-dim: #5c4f3e;
+  --text-muted: #8c7e6c;
+  --border: #d8cfc4;
+  --danger: #c43030;
+  --success: #3a8a4a;
+  --tag-bg: #f0e8d8;
+  --tag-text: #8a6a30;
+}
+
 body {
   background: var(--bg);
   color: var(--text);
@@ -233,7 +250,38 @@ body {
 .quiz-result-actions { display: flex; gap: 12px; justify-content: center; }
 
 /* Export/Import */
-.data-bar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.data-bar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+
+/* Tag Tabs */
+.tag-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.tag-tab {
+  background: var(--card); border: 1px solid var(--border); color: var(--text-dim);
+  padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all 0.15s; white-space: nowrap;
+}
+.tag-tab:hover { border-color: var(--accent); color: var(--accent); }
+.tag-tab.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.tag-tab-count { font-size: 10px; opacity: 0.7; margin-left: 4px; }
+
+/* Theme Toggle */
+.theme-toggle {
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+  transition: all 0.15s;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Fill-in-the-blank */
+.fill-blank-input {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--accent); padding: 4px 10px; font-size: 16px; font-family: inherit;
+  width: 140px; text-align: center; outline: none; transition: border-color 0.2s;
+}
+.fill-blank-input:focus { border-color: var(--accent); }
+.fill-blank-input.correct { border-color: var(--success); color: var(--success); }
+.fill-blank-input.wrong { border-color: var(--danger); color: var(--danger); }
+.fill-sentence { font-size: 16px; color: var(--text-dim); line-height: 2; font-style: italic; }
 
 /* Responsive */
 @media (max-width: 520px) {
@@ -268,6 +316,21 @@ body {
 <div class="toast" id="toast"></div>
 
 <script>
+// ─── Theme ───
+const THEME_KEY = 'vocab-theme';
+function getTheme() { return localStorage.getItem(THEME_KEY) || 'dark'; }
+function setTheme(t) {
+  localStorage.setItem(THEME_KEY, t);
+  document.documentElement.setAttribute('data-theme', t);
+}
+function toggleTheme() {
+  const next = getTheme() === 'dark' ? 'light' : 'dark';
+  setTheme(next);
+  render();
+}
+// Apply saved theme on load
+setTheme(getTheme());
+
 // ─── Storage ───
 const STORAGE_KEY = 'vocab-notebook-words';
 const WORKER_URL_KEY = 'vocab-worker-url';
@@ -423,12 +486,13 @@ function escapeHtml(str) {
 // ─── State ───
 let state = {
   words: loadWords(),
-  view: 'list', // list, add, edit, quiz
+  view: 'list', // list, add, edit, quiz, fillblank
   editWord: null,
   search: '',
   filterTag: '',
   filterDifficulty: 0,
   sortBy: 'newest',
+  activeTagTab: '', // for tag tab UI
   // quiz
   quizMode: null,
   quizPool: [],
@@ -436,6 +500,13 @@ let state = {
   quizShowAnswer: false,
   quizScore: { correct: 0, wrong: 0 },
   quizFinished: false,
+  // fill-in-the-blank quiz
+  fillPool: [],
+  fillCurrent: 0,
+  fillScore: { correct: 0, wrong: 0 },
+  fillFinished: false,
+  fillAnswered: false,
+  fillUserAnswer: '',
   // expanded cards
   expandedId: null,
 };
@@ -631,6 +702,48 @@ function quizJudge(correct) {
   });
 }
 
+// ─── Fill-in-the-Blank Quiz ───
+function startFillBlank() {
+  const wordsWithExamples = state.words.filter(w => w.term && w.example && w.example.toLowerCase().includes(w.term.toLowerCase()));
+  if (wordsWithExamples.length < 3) return showToast('예문이 있는 단어가 3개 이상 필요합니다');
+  const shuffled = [...wordsWithExamples].sort(() => Math.random() - 0.5).slice(0, Math.min(15, wordsWithExamples.length));
+  setState({
+    view: 'fillblank', fillPool: shuffled, fillCurrent: 0,
+    fillScore: { correct: 0, wrong: 0 }, fillFinished: false,
+    fillAnswered: false, fillUserAnswer: '',
+  });
+}
+
+function fillCheck() {
+  const w = state.fillPool[state.fillCurrent];
+  const input = document.getElementById('fill-input');
+  if (!input) return;
+  const userAnswer = input.value.trim().toLowerCase();
+  const correct = userAnswer === w.term.toLowerCase();
+  const s = { ...state.fillScore };
+  s[correct ? 'correct' : 'wrong']++;
+  setState({ fillAnswered: true, fillUserAnswer: userAnswer, fillScore: s });
+  // Style the input
+  const el = document.getElementById('fill-input');
+  if (el) { el.classList.add(correct ? 'correct' : 'wrong'); el.disabled = true; }
+}
+
+function fillNext() {
+  const next = state.fillCurrent + 1;
+  setState({
+    fillCurrent: next, fillFinished: next >= state.fillPool.length,
+    fillAnswered: false, fillUserAnswer: '',
+  });
+  setTimeout(() => { const el = document.getElementById('fill-input'); if (el) el.focus(); }, 50);
+}
+
+// ─── Tag Tab helpers ───
+function setActiveTagTab(tag) {
+  state.activeTagTab = state.activeTagTab === tag ? '' : tag;
+  state.filterTag = state.activeTagTab;
+  render();
+}
+
 // ─── Filtering ───
 function getFiltered() {
   let words = [...state.words];
@@ -693,12 +806,14 @@ function render() {
         <div class="word-count">${state.words.length}개 단어 수집됨</div>
       </div>
       <div class="header-actions">
-        ${getWorkerUrl() && !isQuiz ? `<button class="btn btn-outline" style="font-size:12px;padding:6px 10px;${syncStatus==='syncing'?'opacity:0.5;pointer-events:none;':''}" onclick="syncFromNotion()" title="Notion 동기화">
+        <button class="theme-toggle" onclick="toggleTheme()" title="테마 전환">${getTheme()==='dark'?'☀️':'🌙'}</button>
+        ${getWorkerUrl() && !isQuiz && state.view !== 'fillblank' ? `<button class="btn btn-outline" style="font-size:12px;padding:6px 10px;${syncStatus==='syncing'?'opacity:0.5;pointer-events:none;':''}" onclick="syncFromNotion()" title="Notion 동기화">
           ${syncStatus==='syncing' ? '⟳' : syncStatus==='success' ? '✓' : syncStatus==='error' ? '!' : '↻'} 동기화
         </button>` : ''}
-        ${state.words.length >= 3 && !isQuiz ? `<button class="btn btn-outline" onclick="setState({view:'quiz',quizMode:null,quizFinished:false})">복습 퀴즈</button>` : ''}
-        ${state.view !== 'add' && !isQuiz ? `<button class="btn btn-primary" onclick="state._formTags=[];state._formDifficulty=0;setState({view:'add'})">+ 단어 추가</button>` : ''}
-        ${isQuiz ? `<button class="btn btn-outline" onclick="setState({view:'list'})">돌아가기</button>` : ''}
+        ${state.words.length >= 3 && !isQuiz && state.view !== 'fillblank' ? `<button class="btn btn-outline" onclick="setState({view:'quiz',quizMode:null,quizFinished:false})">복습 퀴즈</button>` : ''}
+        ${state.words.length >= 3 && !isQuiz && state.view !== 'fillblank' ? `<button class="btn btn-outline" onclick="startFillBlank()">빈칸 퀴즈</button>` : ''}
+        ${state.view !== 'add' && !isQuiz && state.view !== 'fillblank' ? `<button class="btn btn-primary" onclick="state._formTags=[];state._formDifficulty=0;setState({view:'add'})">+ 단어 추가</button>` : ''}
+        ${isQuiz || state.view === 'fillblank' ? `<button class="btn btn-outline" onclick="setState({view:'list'})">돌아가기</button>` : ''}
       </div>
     </div>
   </div>
@@ -706,6 +821,8 @@ function render() {
 
   if (state.view === 'quiz') {
     html += renderQuiz();
+  } else if (state.view === 'fillblank') {
+    html += renderFillBlank();
   } else if (state.view === 'add') {
     html += renderForm(null);
   } else if (state.view === 'edit' && state.editWord) {
@@ -739,6 +856,16 @@ function renderList() {
     <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="exportCSV()">CSV 내보내기</button>` : ''}
     <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="importWords()">가져오기</button>
   </div>`;
+
+  // Tag Tabs (수업별 모아보기)
+  if (allTags.length > 0) {
+    const tagCounts = {};
+    state.words.forEach(w => (w.tags||[]).forEach(t => { tagCounts[t] = (tagCounts[t]||0) + 1; }));
+    html += `<div class="tag-tabs">
+      <button class="tag-tab ${state.activeTagTab===''?'active':''}" onclick="setActiveTagTab('')">전체<span class="tag-tab-count">${state.words.length}</span></button>
+      ${allTags.map(t => `<button class="tag-tab ${state.activeTagTab===t?'active':''}" onclick="setActiveTagTab('${escapeHtml(t)}')">${escapeHtml(t)}<span class="tag-tab-count">${tagCounts[t]||0}</span></button>`).join('')}
+    </div>`;
+  }
 
   // Search
   html += `<div class="search-wrap">
@@ -939,6 +1066,72 @@ function renderQuiz() {
       <button class="quiz-wrong" onclick="quizJudge(false)">몰랐어요 ✗</button>
       <button class="quiz-right" onclick="quizJudge(true)">알았어요 ✓</button>
     </div>`;
+  }
+
+  html += `</div>
+    <button class="btn-ghost" style="width:100%;margin-top:20px;text-align:center" onclick="setState({view:'list'})">퀴즈 종료</button>
+  </div>`;
+  return html;
+}
+
+// ─── Render Fill-in-the-Blank Quiz ───
+function renderFillBlank() {
+  // Result
+  if (state.fillFinished || state.fillPool.length === 0) {
+    const total = state.fillScore.correct + state.fillScore.wrong;
+    const pct = total > 0 ? Math.round((state.fillScore.correct / total) * 100) : 0;
+    const emoji = pct >= 80 ? '🎉' : pct >= 50 ? '💪' : '📖';
+    return `<div class="quiz-center fade-in">
+      <div class="quiz-result-icon">${emoji}</div>
+      <div class="quiz-title">빈칸 퀴즈 완료!</div>
+      <div class="quiz-result-pct">${pct}%</div>
+      <div class="quiz-result-detail">${total}개 중 ${state.fillScore.correct}개 정답</div>
+      <div class="quiz-result-actions">
+        <button class="btn btn-primary" onclick="startFillBlank()">다시 하기</button>
+        <button class="btn btn-outline" onclick="setState({view:'list'})">돌아가기</button>
+      </div>
+    </div>`;
+  }
+
+  const w = state.fillPool[state.fillCurrent];
+  const term = w.term;
+  const regex = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  const parts = w.example.split(regex);
+  
+  let sentenceHtml = '';
+  for (let i = 0; i < parts.length; i++) {
+    sentenceHtml += escapeHtml(parts[i]);
+    if (i < parts.length - 1) {
+      if (state.fillAnswered) {
+        const isCorrect = state.fillUserAnswer === term.toLowerCase();
+        sentenceHtml += `<span style="font-weight:700;color:var(--accent)">${escapeHtml(term)}</span>`;
+      } else {
+        sentenceHtml += `<input class="fill-blank-input" id="fill-input" placeholder="?" autocomplete="off" autocapitalize="off" onkeydown="if(event.key==='Enter')fillCheck()">`;
+      }
+    }
+  }
+
+  let html = `<div style="max-width:560px;margin:0 auto" class="fade-in">
+    <div class="quiz-header">
+      <span>${state.fillCurrent + 1} / ${state.fillPool.length}</span>
+      <div><span class="quiz-score-ok">✓ ${state.fillScore.correct}</span>&nbsp;&nbsp;<span class="quiz-score-fail">✗ ${state.fillScore.wrong}</span></div>
+    </div>
+    <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${(state.fillCurrent/state.fillPool.length)*100}%"></div></div>
+    <div class="quiz-center">
+      <div class="quiz-question-label">빈칸에 들어갈 단어를 입력하세요</div>
+      <div style="margin-bottom:12px;font-size:15px;color:var(--text-dim)">${escapeHtml(w.meaning)}</div>
+      <div class="fill-sentence" style="margin-bottom:24px">${sentenceHtml}</div>`;
+
+  if (!state.fillAnswered) {
+    html += `<button class="quiz-reveal-btn" onclick="fillCheck()">확인</button>`;
+  } else {
+    const isCorrect = state.fillUserAnswer === term.toLowerCase();
+    html += `<div class="quiz-answer-box" style="border-color:${isCorrect?'var(--success)':'var(--danger)'}40">
+      <div style="font-size:14px;color:${isCorrect?'var(--success)':'var(--danger)'};margin-bottom:4px">${isCorrect ? '정답! ✓' : '오답 ✗'}</div>
+      ${!isCorrect ? `<div style="font-size:13px;color:var(--text-muted);margin-bottom:4px">내 답: <span style="text-decoration:line-through">${escapeHtml(state.fillUserAnswer || '(빈 답)')}</span></div>` : ''}
+      <div class="quiz-answer-text" style="color:var(--accent)">${escapeHtml(term)} <span onclick="speak('${escapeHtml(term).replace(/'/g,"\\'")}', event)" style="cursor:pointer;opacity:0.5;font-size:18px;vertical-align:middle">🔊</span></div>
+    </div>
+    <button class="quiz-reveal-btn" onclick="fillNext()" style="margin-top:12px">${state.fillCurrent + 1 >= state.fillPool.length ? '결과 보기' : '다음 →'}</button>`;
   }
 
   html += `</div>
