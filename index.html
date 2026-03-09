@@ -552,24 +552,42 @@ function importWords() {
   input.onchange = (e) => {
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const imported = JSON.parse(ev.target.result);
         if (!Array.isArray(imported)) throw new Error();
         const existing = new Set(state.words.map(w => w.term.toLowerCase()));
-        let added = 0;
+        const newWords = [];
         imported.forEach(w => {
           if (w.term && w.meaning && !existing.has(w.term.toLowerCase())) {
             w.id = w.id || generateId();
             w.createdAt = w.createdAt || Date.now();
             state.words.unshift(w);
             existing.add(w.term.toLowerCase());
-            added++;
+            newWords.push(w);
           }
         });
         saveWords(state.words);
-        showToast(`${added}개 단어 가져오기 완료!`);
+        showToast(`${newWords.length}개 단어 가져오기 완료!`);
         render();
+        // 자동으로 Notion에 업로드
+        if (getWorkerUrl() && newWords.length > 0) {
+          showToast(`Notion에 ${newWords.length}개 업로드 중...`);
+          let uploaded = 0;
+          for (const w of newWords) {
+            try {
+              const data = await notionFetch('/api/words', 'POST', w);
+              if (data.success && data.id) {
+                const idx = state.words.findIndex(x => x.term === w.term);
+                if (idx >= 0) { state.words[idx].id = data.id; delete state.words[idx]._localOnly; }
+                uploaded++;
+              }
+            } catch (err) { console.warn('Notion 업로드 실패:', w.term, err); }
+          }
+          saveWords(state.words);
+          showToast(`Notion에 ${uploaded}개 업로드 완료!`);
+          render();
+        }
       } catch {
         showToast('파일 형식이 올바르지 않습니다');
       }
