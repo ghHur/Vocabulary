@@ -659,6 +659,26 @@ function getAllTags() {
   return [...set].sort();
 }
 
+// ─── Pronunciation (TTS) ───
+function speak(text, event) {
+  if (event) event.stopPropagation();
+  if (!text || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.85;
+  // Try to find a good English voice
+  const voices = window.speechSynthesis.getVoices();
+  const enVoice = voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang.startsWith('en'));
+  if (enVoice) utterance.voice = enVoice;
+  window.speechSynthesis.speak(utterance);
+}
+// Preload voices
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
+
 // ─── Render ───
 function render() {
   const app = document.getElementById('app');
@@ -771,6 +791,7 @@ function renderList() {
             <div class="card-left">
               <div class="term-row">
                 <span class="term">${escapeHtml(w.term)}</span>
+                <span class="star" onclick="speak('${escapeHtml(w.term).replace(/'/g,"\\'")}', event)" title="발음 듣기" style="cursor:pointer;opacity:0.5;font-size:16px">🔊</span>
                 ${starsHtml(w.difficulty||0, true, w.id)}
               </div>
               <div class="meaning">${escapeHtml(w.meaning)}</div>
@@ -900,7 +921,7 @@ function renderQuiz() {
     <div class="quiz-progress-bar"><div class="quiz-progress-fill" style="width:${(state.quizCurrent/state.quizPool.length)*100}%"></div></div>
     <div class="quiz-center">
       <div class="quiz-question-label">${qLabel}</div>
-      <div class="quiz-question-word">${escapeHtml(question)}</div>`;
+      <div class="quiz-question-word">${escapeHtml(question)} <span onclick="speak('${escapeHtml(state.quizMode==='en-ko'?w.term:answer).replace(/'/g,"\\'")}', event)" style="cursor:pointer;opacity:0.5;font-size:20px;vertical-align:middle">🔊</span></div>`;
 
   if (w.example && !state.quizShowAnswer) {
     const hint = w.example.replace(new RegExp(w.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '____');
@@ -911,7 +932,7 @@ function renderQuiz() {
     html += `<button class="quiz-reveal-btn" onclick="quizReveal()">정답 보기</button>`;
   } else {
     html += `<div class="quiz-answer-box">
-      <div class="quiz-answer-text">${escapeHtml(answer)}</div>
+      <div class="quiz-answer-text">${escapeHtml(answer)} <span onclick="speak('${escapeHtml(state.quizMode==='en-ko'?answer:w.term).replace(/'/g,"\\'")}', event)" style="cursor:pointer;opacity:0.5;font-size:18px;vertical-align:middle">🔊</span></div>
       ${w.example ? `<div class="quiz-answer-example">${escapeHtml(w.example)}</div>` : ''}
     </div>
     <div class="quiz-judge">
