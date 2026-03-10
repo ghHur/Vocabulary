@@ -252,16 +252,20 @@ body {
 /* Export/Import */
 .data-bar { display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 
-/* Tag Tabs */
-.tag-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+/* Tag Tabs - Hierarchical */
+.tag-hierarchy { margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.tag-level { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 2px 0; }
+.tag-level::-webkit-scrollbar { display: none; }
+.tag-level-2 { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
 .tag-tab {
   background: var(--card); border: 1px solid var(--border); color: var(--text-dim);
   padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
-  cursor: pointer; font-family: inherit; transition: all 0.15s; white-space: nowrap;
+  cursor: pointer; font-family: inherit; transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
 }
 .tag-tab:hover { border-color: var(--accent); color: var(--accent); }
 .tag-tab.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .tag-tab-count { font-size: 10px; opacity: 0.7; margin-left: 4px; }
+.tag-level-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; font-weight: 600; }
 
 /* Theme Toggle */
 .theme-toggle {
@@ -492,7 +496,10 @@ let state = {
   filterTag: '',
   filterDifficulty: 0,
   sortBy: 'newest',
-  activeTagTab: '', // for tag tab UI
+  activeTagTab: '', // for tag tab UI (legacy, now unused)
+  activeSubject: '', // 1st level: subject (e.g. MATH1040)
+  activeSource: '', // 2nd level: source (e.g. MATH1040-Sec3.2)
+  filterCategory: '', // category filter (e.g. 통계, 철학)
   // quiz
   quizMode: null,
   quizPool: [],
@@ -755,8 +762,72 @@ function fillNext() {
   setTimeout(() => { const el = document.getElementById('fill-input'); if (el) el.focus(); }, 50);
 }
 
-// ─── Tag Tab helpers ───
+// ─── Tag Classification ───
+const isSubjectTag = tag => /^[A-Z]+\d+$/.test(tag);
+const isSourceTag = tag => tag.includes('-');
+const isCategoryTag = tag => !isSubjectTag(tag) && !isSourceTag(tag);
+
+function getSubjectTags() {
+  const counts = {};
+  state.words.forEach(w => (w.tags||[]).filter(isSubjectTag).forEach(t => { counts[t] = (counts[t]||0) + 1; }));
+  return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function getSourceTagsForSubject(subject) {
+  const counts = {};
+  state.words.forEach(w => {
+    const tags = w.tags || [];
+    if (tags.includes(subject)) {
+      tags.filter(t => isSourceTag(t) && t.startsWith(subject + '-')).forEach(t => {
+        counts[t] = (counts[t]||0) + 1;
+      });
+    }
+  });
+  return Object.entries(counts).sort((a, b) => {
+    // Natural sort for section numbers
+    const aNum = a[0].replace(subject + '-', '');
+    const bNum = b[0].replace(subject + '-', '');
+    return aNum.localeCompare(bNum, undefined, { numeric: true });
+  });
+}
+
+function getCategoryTags() {
+  const counts = {};
+  state.words.forEach(w => (w.tags||[]).filter(isCategoryTag).forEach(t => { counts[t] = (counts[t]||0) + 1; }));
+  return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function getSubjectWordCount(subject) {
+  return state.words.filter(w => (w.tags||[]).includes(subject)).length;
+}
+
+// ─── Tag Tab handlers ───
+function setActiveSubject(subject) {
+  if (state.activeSubject === subject) {
+    state.activeSubject = '';
+    state.activeSource = '';
+    state.filterTag = '';
+  } else {
+    state.activeSubject = subject;
+    state.activeSource = '';
+    state.filterTag = subject;
+  }
+  render();
+}
+
+function setActiveSource(source) {
+  if (state.activeSource === source) {
+    state.activeSource = '';
+    state.filterTag = state.activeSubject;
+  } else {
+    state.activeSource = source;
+    state.filterTag = source;
+  }
+  render();
+}
+
 function setActiveTagTab(tag) {
+  // Legacy function kept for compatibility
   state.activeTagTab = state.activeTagTab === tag ? '' : tag;
   state.filterTag = state.activeTagTab;
   render();
@@ -772,6 +843,7 @@ function getFiltered() {
     );
   }
   if (state.filterTag) words = words.filter(w => (w.tags||[]).includes(state.filterTag));
+  if (state.filterCategory) words = words.filter(w => (w.tags||[]).includes(state.filterCategory));
   if (state.filterDifficulty > 0) words = words.filter(w => (w.difficulty||0) === state.filterDifficulty);
 
   words.sort((a, b) => {
@@ -862,7 +934,7 @@ function render() {
 function renderList() {
   const filtered = getFiltered();
   const allTags = getAllTags();
-  const hasFilters = state.search || state.filterTag || state.filterDifficulty > 0;
+  const hasFilters = state.search || state.filterTag || state.filterCategory || state.filterDifficulty > 0;
 
   let html = '';
 
@@ -875,14 +947,30 @@ function renderList() {
     <button class="btn btn-outline" style="font-size:12px;padding:6px 12px" onclick="importWords()">가져오기</button>
   </div>`;
 
-  // Tag Tabs (수업별 모아보기)
-  if (allTags.length > 0) {
-    const tagCounts = {};
-    state.words.forEach(w => (w.tags||[]).forEach(t => { tagCounts[t] = (tagCounts[t]||0) + 1; }));
-    html += `<div class="tag-tabs">
-      <button class="tag-tab ${state.activeTagTab===''?'active':''}" onclick="setActiveTagTab('')">전체<span class="tag-tab-count">${state.words.length}</span></button>
-      ${allTags.map(t => `<button class="tag-tab ${state.activeTagTab===t?'active':''}" onclick="setActiveTagTab('${escapeHtml(t)}')">${escapeHtml(t)}<span class="tag-tab-count">${tagCounts[t]||0}</span></button>`).join('')}
+  // Hierarchical Tag Tabs
+  const subjectTags = getSubjectTags();
+  if (subjectTags.length > 0 || state.words.length > 0) {
+    html += `<div class="tag-hierarchy">`;
+    // Level 1: Subject tabs
+    html += `<div class="tag-level">
+      <button class="tag-tab ${state.activeSubject===''?'active':''}" onclick="setActiveSubject('')">전체<span class="tag-tab-count">${state.words.length}</span></button>
+      ${subjectTags.map(([t, c]) => `<button class="tag-tab ${state.activeSubject===t?'active':''}" onclick="setActiveSubject('${escapeHtml(t)}')">${escapeHtml(t)}<span class="tag-tab-count">${c}</span></button>`).join('')}
     </div>`;
+    // Level 2: Source tabs (only when subject is selected)
+    if (state.activeSubject) {
+      const sourceTags = getSourceTagsForSubject(state.activeSubject);
+      if (sourceTags.length > 0) {
+        const subjectCount = getSubjectWordCount(state.activeSubject);
+        html += `<div class="tag-level tag-level-2">
+          <button class="tag-tab ${state.activeSource===''?'active':''}" onclick="setActiveSource('')">전체<span class="tag-tab-count">${subjectCount}</span></button>
+          ${sourceTags.map(([t, c]) => {
+            const label = t.replace(state.activeSubject + '-', '');
+            return `<button class="tag-tab ${state.activeSource===t?'active':''}" onclick="setActiveSource('${escapeHtml(t)}')">${escapeHtml(label)}<span class="tag-tab-count">${c}</span></button>`;
+          }).join('')}
+        </div>`;
+      }
+    }
+    html += `</div>`;
   }
 
   // Search
@@ -903,10 +991,11 @@ function renderList() {
       <option value="difficulty" ${state.sortBy==='difficulty'?'selected':''}>난이도순</option>
     </select>`;
 
-  if (allTags.length > 0) {
-    html += `<select class="filter-select ${state.filterTag ? 'active' : ''}" onchange="state.filterTag=this.value;render()">
-      <option value="">모든 태그</option>
-      ${allTags.map(t => `<option value="${escapeHtml(t)}" ${state.filterTag===t?'selected':''}>${escapeHtml(t)}</option>`).join('')}
+  const categoryTags = getCategoryTags();
+  if (categoryTags.length > 0) {
+    html += `<select class="filter-select ${state.filterCategory ? 'active' : ''}" onchange="state.filterCategory=this.value;render()">
+      <option value="">모든 카테고리</option>
+      ${categoryTags.map(([t, c]) => `<option value="${escapeHtml(t)}" ${state.filterCategory===t?'selected':''}>${escapeHtml(t)} (${c})</option>`).join('')}
     </select>`;
   }
 
@@ -917,7 +1006,7 @@ function renderList() {
     </button>`;
   }
 
-  if (hasFilters) html += `<button class="filter-reset" onclick="state.search='';state.filterTag='';state.filterDifficulty=0;render()">필터 초기화</button>`;
+  if (hasFilters) html += `<button class="filter-reset" onclick="state.search='';state.filterTag='';state.filterCategory='';state.filterDifficulty=0;state.activeSubject='';state.activeSource='';render()">필터 초기화</button>`;
   html += `<span class="filter-count">${filtered.length}개 표시</span></div>`;
 
   // Cards
